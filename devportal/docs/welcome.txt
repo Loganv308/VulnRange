@@ -1,0 +1,5 @@
+Welcome to DevPortal.
+
+Ops notes:
+- Build artifacts live in /opt on the app container.
+- Cloud metadata mock runs at http://metadata:8080 (internal network only).

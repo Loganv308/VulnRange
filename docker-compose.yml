@@ -1,0 +1,57 @@
+# VulnRange -- intentionally vulnerable apps. Run ./setup.sh first to generate .env with random flags.
+# BIND_IP defaults to 127.0.0.1. Set it to the lab-host IP on an ISOLATED lab VLAN only if
+# you're attacking from a separate Kali VM. Never port-forward these.
+
+x-hardening: &hardening
+  restart: unless-stopped
+  mem_limit: 256m
+  pids_limit: 200
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  brokenbank:
+    <<: *hardening
+    build:
+      context: ./brokenbank
+      args: { FLAG_BANK_SSTI: "${FLAG_BANK_SSTI}" }
+    environment:
+      FLAG_BANK_SQLI_LOGIN: "${FLAG_BANK_SQLI_LOGIN}"
+      FLAG_BANK_SQLI_UNION: "${FLAG_BANK_SQLI_UNION}"
+      FLAG_BANK_IDOR: "${FLAG_BANK_IDOR}"
+      FLAG_BANK_LOGIC: "${FLAG_BANK_LOGIC}"
+    ports: ["${BIND_IP:-127.0.0.1}:8001:5000"]
+    networks: [frontend]
+
+  devportal:
+    <<: *hardening
+    build:
+      context: ./devportal
+      args: { FLAG_DEV_FILE: "${FLAG_DEV_FILE}" }
+    environment:
+      FLAG_DEV_JWT: "${FLAG_DEV_JWT}"
+      METADATA_URL: "http://metadata:8080/latest/meta-data/"
+      NODE_ENV: "development"
+    ports: ["${BIND_IP:-127.0.0.1}:8002:3000"]
+    networks: [frontend, internal]
+
+  metadata:
+    <<: *hardening
+    build: ./metadata
+    environment:
+      FLAG_SSRF: "${FLAG_SSRF}"
+    networks: [internal]   # no published port: reachable only through devportal
+
+  fileshare:
+    <<: *hardening
+    build:
+      context: ./fileshare
+      args:
+        FLAG_FS_RCE: "${FLAG_FS_RCE}"
+        FLAG_FS_LFI: "${FLAG_FS_LFI}"
+    ports: ["${BIND_IP:-127.0.0.1}:8003:80"]
+    networks: [frontend]
+
+networks:
+  frontend:
+  internal:
+    internal: true   # no outbound internet from this network
